@@ -38,6 +38,6 @@
     <Hidden>false</Hidden>
 
     <!-- Set to the hash of the tested commit before submitting to PluginHub -->
-    <Commit>0000000000000000000000000000000000000000</Commit>
+    <Commit>35178985898cd42d3377923c7db9fa0e5a1b1250</Commit>
 
 </PluginData>
