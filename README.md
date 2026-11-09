@@ -81,8 +81,8 @@ Saved to `%AppData%\SpaceEngineers\Storage\PolarsThrustPreview.cfg`, created wit
 
 A session component, created and unloaded with each world by the game:
 
-- Ten times a second it checks what to show. In a cockpit it refreshes the numbers once a second, while building ten times a second.
-- The block lists are scanned only when the ship changes (block added or removed, a subgrid attached or lost) and every 10 seconds as a safety net. Refreshes reuse the cached lists.
+- Ten times a second it checks what to show. The numbers refresh once a second. While building they also refresh at once when the held block, its rotation, its symmetry copies, the target grid or the ship's blocks change; moving the block across the grid costs nothing.
+- The block lists are scanned only when the ship changes (block added or removed, a subgrid attached or lost) or a new ship is shown. Refreshes reuse the cached lists.
 - Every frame it only draws the prepared rectangles and text. The panel is laid out in pixels for a 1080p screen and scaled to your resolution and text size.
 - The block in hand is public game data. The build target and gizmo (orientation, symmetry copies) are not, so they are read through getters compiled once per world. If they are missing after a game update, the held block counts for mass only and one line goes to the game log.
 

@@ -11,8 +11,8 @@ namespace PolarsThrustPreview.Game;
 /// <summary>
 /// Turns a grid and its mechanical subgrids (rotors, pistons, hinges) into a <see cref="ShipModel"/>.
 /// The block lists are scanned only when the ship changes (block added or removed, a subgrid
-/// attached or lost) and every 10 seconds as a safety net. The cheap live values (fuel,
-/// batteries, cargo, thruster directions) are refreshed from the cached lists.
+/// attached or lost) or a new ship is shown. The cheap live values (fuel, batteries, cargo,
+/// thruster directions, working state) are refreshed from the cached lists.
 /// </summary>
 internal sealed class ShipScanner
 {
@@ -35,8 +35,6 @@ internal sealed class ShipScanner
         public IMyGasTank Block;
         public int Fuel;
     }
-
-    private const int RescanTicks = 600;
 
     public readonly ShipModel Model = new();
 
@@ -61,7 +59,9 @@ internal sealed class ShipScanner
     private readonly List<IMyCubeGrid> groupBuffer = new();
     private double scannedBaseMass;
     private bool dirty = true;
-    private int ticksSinceScan;
+
+    /// <summary>A block was added or removed since the last scan.</summary>
+    public bool Dirty => dirty;
 
     public void Attach(IMyCubeGrid root)
     {
@@ -97,14 +97,13 @@ internal sealed class ShipScanner
 
     private void OnBlockChanged(IMySlimBlock block) => dirty = true;
 
-    /// <summary>Rescans when needed. Call about once a second while the panel is shown.</summary>
-    public void Update(int ticksElapsed)
+    /// <summary>Rescans when a block or subgrid changed. Call before each refresh.</summary>
+    public void Update()
     {
         if (Root == null)
             return;
 
-        ticksSinceScan += ticksElapsed;
-        if (!dirty && ticksSinceScan < RescanTicks && !GroupChanged())
+        if (!dirty && !GroupChanged())
             return;
 
         Scan();
@@ -128,7 +127,6 @@ internal sealed class ShipScanner
         Detach();
         Root = root;
         dirty = false;
-        ticksSinceScan = 0;
 
         if (root.Closed)
         {

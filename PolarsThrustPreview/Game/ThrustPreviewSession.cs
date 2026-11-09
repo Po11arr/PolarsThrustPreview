@@ -13,8 +13,9 @@ namespace PolarsThrustPreview.Game;
 
 /// <summary>
 /// Client-side session component. Decides what to show (cockpit panel, build preview or
-/// nothing) ten times a second, refreshes the numbers once a second in a cockpit and ten
-/// times a second while building, and draws the prepared layout every frame.
+/// nothing) ten times a second and refreshes the numbers once a second. While building it
+/// also refreshes at once when the held block, its orientation, its symmetry copies, the
+/// target or the ship's blocks change. Every frame it only draws the prepared layout.
 /// </summary>
 [MySessionComponentDescriptor(MyUpdateOrder.AfterSimulation)]
 public class ThrustPreviewSession : MySessionComponentBase
@@ -49,9 +50,9 @@ public class ThrustPreviewSession : MySessionComponentBase
     private bool failed;
     private int tick;
     private int lastRefreshTick;
-    private int lastScanTick;
     private MyDefinitionId lastHeldId;
     private int lastHeldCount = -1;
+    private readonly List<Vector3D> lastPushes = new();
 
     /// <summary>Cargo mass share confirmed in a cockpit with real cargo, or NaN until then.</summary>
     private double measuredCargoFactor = double.NaN;
@@ -174,12 +175,14 @@ public class ThrustPreviewSession : MySessionComponentBase
                 return;
             }
 
-            bool changed = newMode != mode || root != scanner.Root || HeldChanged(held);
+            // Both trackers always run so their stored state stays current
+            bool heldChanged = HeldChanged(held);
+            bool pushesChanged = PushesChanged();
+            bool changed = newMode != mode || root != scanner.Root || heldChanged || pushesChanged || scanner.Dirty;
             mode = newMode;
             scanner.Attach(root);
 
-            int interval = mode == Mode.Build ? DecideTicks : CockpitRefreshTicks;
-            if (!changed && tick - lastRefreshTick < interval)
+            if (!changed && tick - lastRefreshTick < CockpitRefreshTicks)
                 return;
 
             Refresh(config, controller, held);
@@ -218,12 +221,39 @@ public class ThrustPreviewSession : MySessionComponentBase
         return changed;
     }
 
+    /// <summary>
+    /// True when a placement's push direction changed (rotation or symmetry). Moving the
+    /// block across the grid changes nothing on the panel, so position is ignored.
+    /// </summary>
+    private bool PushesChanged()
+    {
+        bool changed = placements.Count != lastPushes.Count;
+        if (!changed)
+        {
+            for (int i = 0; i < placements.Count; i++)
+            {
+                if (Vector3D.DistanceSquared(placements[i].Backward, lastPushes[i]) > 1e-6)
+                {
+                    changed = true;
+                    break;
+                }
+            }
+        }
+
+        if (changed)
+        {
+            lastPushes.Clear();
+            for (int i = 0; i < placements.Count; i++)
+                lastPushes.Add(placements[i].Backward);
+        }
+        return changed;
+    }
+
     private void Refresh(Config config, IMyShipController controller, MyCubeBlockDefinition held)
     {
         lastRefreshTick = tick;
 
-        scanner.Update(tick - lastScanTick);
-        lastScanTick = tick;
+        scanner.Update();
         var root = scanner.Root;
         if (root == null)
         {
@@ -382,6 +412,7 @@ public class ThrustPreviewSession : MySessionComponentBase
         mode = Mode.None;
         ops.Clear();
         lastHeldCount = -1;
+        lastPushes.Clear();
         scanner.Detach();
     }
 
