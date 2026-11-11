@@ -15,7 +15,7 @@ Will this ship lift when it is full? See it before you fly, and before you place
 - Lift range on a 0g to 1.5g scale per load.
 - Hover time with a heavy load at 1 g, hydrogen and batteries.
 
-Cockpit: press ' (apostrophe) to cycle full, collapsed, off.
+Cockpit: press / to cycle full, collapsed, off.
 Building: hold a block aimed at your own or your faction's grid; its mass, thrust and symmetry copies are counted before you place it.
 
 Settings: panel key, show while building, inventory size, thrust multiplier, panel size and position.

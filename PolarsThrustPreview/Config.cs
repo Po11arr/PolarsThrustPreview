@@ -14,10 +14,12 @@ public class Config : INotifyPropertyChanged
     #region Options
 
     private bool enabled = true;
-    // "'" (apostrophe) has no vanilla control binding; the game only uses it to name the key.
-    // Old defaults clashed: Ctrl+J also toggled the helmet, "]" is vanilla's next paint colour,
-    // next skin and next camera.
-    private Binding toggleKey = new(MyKeys.OemQuotes);
+    // "/" (OemQuestion) has no vanilla control binding and the game never reads it; it is the
+    // / ? key next to right Shift on both US and UK layouts.
+    // Old defaults clashed: Ctrl+J also toggled the helmet, "]" is next paint colour, skin and
+    // camera, OemQuotes is ' on US layouts but # on UK ones, where ' is toolbar slot 0, F2 is
+    // used by Text HUD mod menus and F11 opens a game menu.
+    private Binding toggleKey = new(MyKeys.OemQuestion);
     private bool showWhileBuilding = true;
     private float inventoryMultiplier;
     private float thrustMultiplier = 1f;
@@ -94,7 +96,7 @@ public class Config : INotifyPropertyChanged
     /// <summary>Config layout version, for upgrading old files. Not shown in the settings.</summary>
     public int SchemaVersion { get; set; }
 
-    private const int CurrentSchema = 3;
+    private const int CurrentSchema = 6;
 
     /// <summary>Clamps values from a hand-edited file and upgrades old ones. True when anything changed.</summary>
     public bool Validate()
@@ -102,12 +104,18 @@ public class Config : INotifyPropertyChanged
         bool changed = false;
         if (SchemaVersion < CurrentSchema)
         {
-            // Schema 1 shipped with Ctrl+J (also opens the helmet)
+            // Earlier defaults, each of which clashed with a vanilla control
+            bool plain = !toggleKey.Ctrl && !toggleKey.Alt && !toggleKey.Shift;
             if (SchemaVersion < 2 && toggleKey.Key == MyKeys.J && toggleKey.Ctrl && !toggleKey.Alt && !toggleKey.Shift)
-                toggleKey = new Binding(MyKeys.OemQuotes);
-            // Schema 2 shipped with "]" (also vanilla's next paint colour, skin and camera)
-            if (toggleKey.Key == MyKeys.OemCloseBrackets && !toggleKey.Ctrl && !toggleKey.Alt && !toggleKey.Shift)
-                toggleKey = new Binding(MyKeys.OemQuotes);
+                toggleKey = new Binding(MyKeys.OemQuestion);
+            else if (SchemaVersion < 3 && plain && toggleKey.Key == MyKeys.OemCloseBrackets)
+                toggleKey = new Binding(MyKeys.OemQuestion);
+            else if (SchemaVersion < 4 && plain && toggleKey.Key == MyKeys.OemQuotes)
+                toggleKey = new Binding(MyKeys.OemQuestion);
+            else if (SchemaVersion < 5 && plain && toggleKey.Key == MyKeys.F2)
+                toggleKey = new Binding(MyKeys.OemQuestion);
+            else if (SchemaVersion < 6 && plain && toggleKey.Key == MyKeys.F11)
+                toggleKey = new Binding(MyKeys.OemQuestion);
             SchemaVersion = CurrentSchema;
             changed = true;
         }
