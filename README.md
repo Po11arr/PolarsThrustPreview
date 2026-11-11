@@ -2,7 +2,7 @@
 
 Mass, thrust-to-weight per direction, lift range and hover endurance for your ship, at its real load, heavily loaded and fully loaded. Shown in the cockpit on a key, and while building with the held block already counted. Client plugin for [Pulsar](https://github.com/SpaceGT/Pulsar).
 
-**Multiplayer:** no server install. It only reads your own ship and draws on your screen.
+**Multiplayer:** no server install. It only reads ships you own or share a faction with (or unowned ones) and draws on your screen.
 
 ## What it shows
 
@@ -23,11 +23,11 @@ The ship is the grid plus everything on rotors, pistons and hinges. Ships docked
 
 ## Cockpit
 
-Sit in a cockpit, remote control or control seat and press **]** (the right square bracket key) to cycle the panel: full, collapsed, off. The collapsed view shows current weight, the Up thrust to weight ratio and the lift bars for current and heavy. The choice stays for every seat until you press it again.
+Sit in a cockpit, remote control or control seat and press **'** (the apostrophe key) to cycle the panel: full, collapsed, off. The collapsed view shows current weight, the Up thrust to weight ratio and the lift bars for current and heavy. The choice stays for every seat until you press it again.
 
 ## Building
 
-Hold a block and aim at a grid: the panel shows with that block already added, before you place it.
+Hold a block and aim at a grid you own, share a faction with, or that has no owner: the panel shows with that block already added, before you place it. Other players' ships are not shown.
 
 - Every block adds its mass.
 - Thrusters add thrust in the direction they would push, so rotate the block and watch the table change. Symmetry copies are counted too.
@@ -50,7 +50,7 @@ Pulsar plugin list > Polar's Thrust Preview > Settings.
 | Option | Default | Range |
 |---|---|---|
 | Enabled | on | |
-| Panel key | ] | any key, optional Ctrl / Alt / Shift. Seated: full, collapsed, off. Holding a block: full, collapsed, hidden |
+| Panel key | ' | any key, optional Ctrl / Alt / Shift. Seated: full, collapsed, off. Holding a block: full, collapsed, hidden |
 | Show while building | on | |
 | Inventory size | 0 | 0 to 100, 0 = world setting |
 | Thrust multiplier | 1 | 0.1 to 10 |
@@ -59,7 +59,7 @@ Pulsar plugin list > Polar's Thrust Preview > Settings.
 
 **Inventory size** plans for another multiplier: cargo volume changes with it. Because the game divides cargo mass by the same multiplier, the mass and TWR stay the same unless a mod changed that rule.
 
-**Panel key** was Ctrl+J before 1.2.3, which also opened the helmet because the game ignores Ctrl on J. Config files still on Ctrl+J move to ] automatically. Every letter key has a vanilla binding, so pick another key with care.
+**Panel key** is ' (apostrophe), which has no vanilla binding. Earlier defaults clashed with the game: Ctrl+J (before 1.2.3) also opened the helmet, and ] (1.2.3 to 1.2.5) is vanilla's next paint colour, next skin and next camera. Config files still on either move to ' automatically. Every letter key and [ ] ; , - . ~ have vanilla bindings, so pick another key with care.
 
 **Thrust multiplier** is a what-if on all thrust, for servers or mods that scale it.
 

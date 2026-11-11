@@ -151,7 +151,7 @@ public class ThrustPreviewSession : MySessionComponentBase
             var newMode = Mode.None;
 
             IMyCubeGrid target = null;
-            holdingBlock = config.ShowWhileBuilding && BuilderAccess.TryGetHeld(out held, out target, placements);
+            holdingBlock = config.ShowWhileBuilding && BuilderAccess.TryGetHeld(out held, out target, placements) && CanBuildOn(target);
             if (holdingBlock)
             {
                 if (buildState == 2)
@@ -219,6 +219,33 @@ public class ThrustPreviewSession : MySessionComponentBase
         lastHeldId = id;
         lastHeldCount = count;
         return changed;
+    }
+
+    /// <summary>
+    /// Build mode only previews grids the player could open in the terminal: unowned, owned by
+    /// the player, or owned by the player's faction. Other players' ships stay hidden.
+    /// </summary>
+    private static bool CanBuildOn(IMyCubeGrid grid)
+    {
+        if (grid == null)
+            return false;
+        var owners = grid.BigOwners;
+        if (owners == null || owners.Count == 0)
+            return true;
+
+        long me = MyAPIGateway.Session?.Player?.IdentityId ?? 0;
+        if (me == 0)
+            return false;
+        var factions = MyAPIGateway.Session.Factions;
+        var myFaction = factions?.TryGetPlayerFaction(me);
+        foreach (var owner in owners)
+        {
+            if (owner == me)
+                return true;
+            if (myFaction != null && factions.TryGetPlayerFaction(owner) == myFaction)
+                return true;
+        }
+        return false;
     }
 
     /// <summary>

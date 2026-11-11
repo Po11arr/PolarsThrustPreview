@@ -14,9 +14,10 @@ public class Config : INotifyPropertyChanged
     #region Options
 
     private bool enabled = true;
-    // "]" is not bound by vanilla Space Engineers and the game never reads it directly.
-    // (Ctrl+J, the old default, also toggled the helmet: vanilla ignores Ctrl on J.)
-    private Binding toggleKey = new(MyKeys.OemCloseBrackets);
+    // "'" (apostrophe) has no vanilla control binding; the game only uses it to name the key.
+    // Old defaults clashed: Ctrl+J also toggled the helmet, "]" is vanilla's next paint colour,
+    // next skin and next camera.
+    private Binding toggleKey = new(MyKeys.OemQuotes);
     private bool showWhileBuilding = true;
     private float inventoryMultiplier;
     private float thrustMultiplier = 1f;
@@ -93,7 +94,7 @@ public class Config : INotifyPropertyChanged
     /// <summary>Config layout version, for upgrading old files. Not shown in the settings.</summary>
     public int SchemaVersion { get; set; }
 
-    private const int CurrentSchema = 2;
+    private const int CurrentSchema = 3;
 
     /// <summary>Clamps values from a hand-edited file and upgrades old ones. True when anything changed.</summary>
     public bool Validate()
@@ -101,9 +102,12 @@ public class Config : INotifyPropertyChanged
         bool changed = false;
         if (SchemaVersion < CurrentSchema)
         {
-            // Version 1 shipped with Ctrl+J, which also opens the helmet
-            if (toggleKey.Key == MyKeys.J && toggleKey.Ctrl && !toggleKey.Alt && !toggleKey.Shift)
-                toggleKey = new Binding(MyKeys.OemCloseBrackets);
+            // Schema 1 shipped with Ctrl+J (also opens the helmet)
+            if (SchemaVersion < 2 && toggleKey.Key == MyKeys.J && toggleKey.Ctrl && !toggleKey.Alt && !toggleKey.Shift)
+                toggleKey = new Binding(MyKeys.OemQuotes);
+            // Schema 2 shipped with "]" (also vanilla's next paint colour, skin and camera)
+            if (toggleKey.Key == MyKeys.OemCloseBrackets && !toggleKey.Ctrl && !toggleKey.Alt && !toggleKey.Shift)
+                toggleKey = new Binding(MyKeys.OemQuotes);
             SchemaVersion = CurrentSchema;
             changed = true;
         }
