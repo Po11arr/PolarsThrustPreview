@@ -39,6 +39,12 @@ public struct DrawOp
 
     public Rgba Color;
     public Align Align;
+
+    /// <summary>Text in the game's "Blue" font (labels), else "White" (values). The font carries the colour; <see cref="Color"/> tints it.</summary>
+    public bool Blue;
+
+    /// <summary>Rectangle texture, null for a flat fill.</summary>
+    public string Texture;
 }
 
 /// <summary>What the panel needs beyond the report: names and the build-mode line.</summary>
@@ -50,6 +56,12 @@ public struct PanelContext
     public int HeldCount;
     public double HeldMass;
     public string HeldPush;
+
+    /// <summary>Thrust to weight ratio [load, direction] without the held block, to show what it adds. Null when not building.</summary>
+    public double[,] BaseTwr;
+
+    /// <summary>Thrust the held thruster(s) add where the ship is, newtons. 0 when not a thruster.</summary>
+    public double HeldThrust;
     public double ChosenInventoryMultiplier;
     public bool InventoryOverridden;
     public double ThrustMultiplier;
@@ -80,22 +92,36 @@ public static class PanelLayout
     private const float SpaceW = 84f;
     private const float TwrBarScale = 3f;
 
+    /// <summary>
+    /// The direction table always takes the height of six rows, so the panel keeps its size
+    /// when matching sides group or split (rotating a held thruster); fewer rows spread out.
+    /// </summary>
+    private const float TwrAreaH = 6 * 24f;
+
+    /// <summary>Smallest change in a ratio worth showing as gained or lost.</summary>
+    private const double DeltaShown = 0.005;
+
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
     private static readonly string[] DirectionNames = { "Fwd", "Back", "Up", "Down", "Left", "Right" };
     private static readonly string[] LoadNames = { "current", "heavy", "max" };
 
-    public static readonly Rgba Panel = new(8, 20, 34, 209);
-    public static readonly Rgba Edge = new(110, 170, 220, 115);
-    public static readonly Rgba HeaderFill = new(79, 163, 224, 31);
-    public static readonly Rgba Accent = new(79, 163, 224);
-    public static readonly Rgba Divider = new(110, 170, 220, 46);
-    public static readonly Rgba Title = new(180, 220, 255);
-    public static readonly Rgba Text = new(230, 238, 246);
-    public static readonly Rgba Soft = new(200, 214, 227);
-    public static readonly Rgba Dim = new(143, 166, 188);
-    public static readonly Rgba Caption = new(127, 150, 172);
-    public static readonly Rgba BoxFill = new(110, 170, 220, 20);
-    public static readonly Rgba Track = new(255, 255, 255, 18);
+    // Colours from the game's block info panel (the HUD panel shown while building):
+    // background colour mask, title bar, title separator and integrity bar background.
+    public const string PanelTexture = "Textures\\GUI\\Screens\\hud_bg_medium_default.dds";
+    public static readonly Rgba Panel = new(34, 46, 52, 235);
+    public static readonly Rgba PanelTint = new(34, 46, 52, 255); // vanilla colour mask on the texture
+    public static readonly Rgba HeaderFill = new(53, 68, 76);
+    public static readonly Rgba Accent = new(105, 119, 132);
+    public static readonly Rgba Divider = new(105, 119, 132, 90);
+    public static readonly Rgba Track = new(78, 116, 137, 110);
+
+    // Values in the White font, labels in the Blue font. Blue-font colours are white tints;
+    // alpha sets the label's weight.
+    public static readonly Rgba Title = new(255, 255, 255);
+    public static readonly Rgba Text = new(255, 255, 255);
+    public static readonly Rgba Soft = new(255, 255, 255, 254);
+    public static readonly Rgba Dim = new(255, 255, 255, 215);
+    public static readonly Rgba Caption = new(255, 255, 255, 170);
     public static readonly Rgba Good = new(111, 210, 122);
     public static readonly Rgba Warn = new(242, 193, 78);
     public static readonly Rgba Bad = new(240, 99, 90);
@@ -119,7 +145,8 @@ public static class PanelLayout
     public static float Build(Report r, PanelContext c, PanelView view, List<DrawOp> ops)
     {
         ops.Clear();
-        ops.Add(default); // background, sized at the end
+        ops.Add(default); // solid background, sized at the end
+        ops.Add(default); // HUD panel texture over it
 
         float y = Header(r, c, ops);
 
@@ -130,7 +157,7 @@ public static class PanelLayout
             Label(ops, Pad, y + 11, "Current weight", 12.5f, Dim);
             Label(ops, 130, y + 11, Mass(r.Mass[(int)Load.Now]), 15, Text);
             Label(ops, Right - 46, y + 11, "Up thrust to weight", 12.5f, Dim, Align.Right);
-            Label(ops, Right, y + 11, Twr(upNow), 15, r.InGravity ? LiftColor(upNow) : Text, Align.Right);
+            Label(ops, Right, y + 11, Twr(upNow), 15, Text, Align.Right);
             y += 30;
             Rect(ops, 0, y, Width, 1, Divider);
             y = Lift(r, ops, y + 8, 2);
@@ -144,9 +171,8 @@ public static class PanelLayout
         for (int i = 0; i < 3; i++)
         {
             float x = Pad + i * (boxW + 8);
-            Rect(ops, x, y, boxW, 44, BoxFill);
-            Label(ops, x + 8, y + 12, boxNames[i], 11, Dim);
-            Label(ops, x + 8, y + 31, Mass(r.Mass[i]), 19, Text);
+            Label(ops, x, y + 12, boxNames[i], 11, Dim);
+            Label(ops, x, y + 31, Mass(r.Mass[i]), 19, Text);
         }
         y += 44;
 
@@ -160,8 +186,8 @@ public static class PanelLayout
         // Thrust to weight table
         y += 8;
         string where = r.InGravity
-            ? "THRUST TO WEIGHT RATIO AT " + Number(r.ReferenceG, 2) + " G, HERE"
-            : "THRUST TO WEIGHT RATIO AT 1 G, IN SPACE";
+            ? "Thrust to weight ratio at " + Number(r.ReferenceG, 2) + " g"
+            : "Thrust to weight ratio at 1 g";
         Label(ops, Pad, y + 8, where, 11, Caption);
         y += 18;
 
@@ -173,9 +199,18 @@ public static class PanelLayout
         y += 16;
 
         BuildRows(r);
+        float pitch = TwrAreaH / Math.Max(1, rows.Count);
+        float areaTop = y;
         foreach (var row in rows)
         {
-            float cy = y + 10;
+            bool anyDelta = false;
+            if (c.BaseTwr != null)
+                for (int load = 0; load < 3; load++)
+                    if (Math.Abs(r.Twr[load, row.Dir] - c.BaseTwr[load, row.Dir]) >= DeltaShown)
+                        anyDelta = true;
+
+            // Value line centred in its slot, or nudged up to make room for the change below it
+            float cy = y + pitch / 2 - (anyDelta ? 5 : 0);
             Label(ops, Pad, cy, row.Name, 12.5f, row.IsLift ? Text : Dim);
             for (int load = 0; load < 3; load++)
             {
@@ -183,19 +218,37 @@ public static class PanelLayout
                 var tone = row.IsLift && r.InGravity ? LiftColor(twr) : MoveColor(twr);
                 float x = cellX + load * cellW;
                 float barW = cellW - 45;
+                float fill = barW * (float)Math.Min(1.0, Math.Max(0, twr) / TwrBarScale);
                 Rect(ops, x, cy - 3.5f, barW, 7, Track);
-                Rect(ops, x, cy - 3.5f, barW * (float)Math.Min(1.0, Math.Max(0, twr) / TwrBarScale), 7, tone);
-                Label(ops, x + cellW - 6, cy, Twr(twr), 12.5f, tone, Align.Right);
+
+                double delta = c.BaseTwr == null ? 0 : twr - c.BaseTwr[load, row.Dir];
+                if (delta >= DeltaShown)
+                {
+                    // Part from the ship as it is, then the part the held block adds, in amber
+                    float before = barW * (float)Math.Min(1.0, Math.Max(0, c.BaseTwr[load, row.Dir]) / TwrBarScale);
+                    Rect(ops, x, cy - 3.5f, before, 7, tone);
+                    Rect(ops, x + before, cy - 3.5f, fill - before, 7, PlaceText);
+                }
+                else
+                {
+                    Rect(ops, x, cy - 3.5f, fill, 7, tone);
+                }
+                Label(ops, x + cellW - 6, cy, Twr(twr), 12.5f, Text, Align.Right);
+
+                if (delta >= DeltaShown)
+                    Label(ops, x + cellW - 6, cy + 12, "+" + Twr(delta), 10.5f, PlaceText, Align.Right);
+                else if (delta <= -DeltaShown)
+                    Label(ops, x + cellW - 6, cy + 12, "-" + Twr(-delta), 10.5f, Dim, Align.Right);
             }
 
             float sx = Right - SpaceW / 2;
             if (r.NoSpaceThrust[row.Dir])
                 Label(ops, sx, cy, "no", 12f, Bad, Align.Center);
             else
-                Label(ops, sx, cy, "yes", 12f, Good, Align.Center);
-            y += 20;
+                Label(ops, sx, cy, "yes", 12f, Text, Align.Center);
+            y += pitch;
         }
-        y += 8;
+        y = areaTop + TwrAreaH + 4;
         Rect(ops, 0, y, Width, 1, Divider);
 
         // Lift in gravity
@@ -204,7 +257,7 @@ public static class PanelLayout
 
         // Hover time
         y += 8;
-        Label(ops, Pad, y + 8, "HOVER TIME, HEAVY LOAD, AT 1 G", 11, Caption);
+        Label(ops, Pad, y + 8, "Hover time, heavy load, at 1 g", 11, Caption);
         y += 18;
 
         if (double.IsInfinity(r.HoverThrottle))
@@ -232,7 +285,7 @@ public static class PanelLayout
                 Label(ops, Pad, y + 11, "Batteries", 13, Soft);
                 if (r.ElectricSustained)
                 {
-                    Label(ops, 120, y + 11, "covered by generators", 13, Good);
+                    Label(ops, 120, y + 11, "covered by generators", 13, Text);
                 }
                 else
                 {
@@ -249,19 +302,21 @@ public static class PanelLayout
     private static float Header(Report r, PanelContext c, List<DrawOp> ops)
     {
         Rect(ops, 0, 0, Width, 34, HeaderFill);
-        Rect(ops, 0, 34, Width, 2, Accent);
-        Label(ops, Pad, 17, "THRUST PREVIEW", 16, Title);
+        Rect(ops, 0, 34, Width, 1, Accent);
+        Label(ops, Pad, 17, "Thrust preview", 16, Title);
         string name = Trim(c.ShipName, 32) + (c.StaticGrid ? " (static)" : "");
         Label(ops, Right, 17, name, 13, Dim, Align.Right);
-        float y = 36;
+        float y = 35;
 
         if (c.Building && !string.IsNullOrEmpty(c.HeldBlockName))
         {
             Rect(ops, 0, y, Width, 26, PlaceFill);
             Rect(ops, 0, y + 26, Width, 1, PlaceEdge);
             string count = c.HeldCount > 1 ? " x" + c.HeldCount : "";
-            string push = string.IsNullOrEmpty(c.HeldPush) ? "" : "  |  pushes " + c.HeldPush;
-            Label(ops, Pad, y + 13, "+ " + Trim(c.HeldBlockName, 34) + count + push + "  |  +" + Mass(c.HeldMass), 12.5f, PlaceText);
+            string thrust = c.HeldThrust > 0
+                ? "  |  +" + Force(c.HeldThrust) + (string.IsNullOrEmpty(c.HeldPush) || c.HeldPush == "?" ? "" : " " + c.HeldPush)
+                : string.IsNullOrEmpty(c.HeldPush) ? "" : "  |  pushes " + c.HeldPush;
+            Label(ops, Pad, y + 13, "+ " + Trim(c.HeldBlockName, 30) + count + thrust + "  |  +" + Mass(c.HeldMass), 12.5f, PlaceText);
             y += 27;
         }
         return y;
@@ -270,7 +325,7 @@ public static class PanelLayout
     /// <summary>Lift bars for the first <paramref name="loads"/> loads. Returns the y below the section.</summary>
     private static float Lift(Report r, List<DrawOp> ops, float y, int loads)
     {
-        Label(ops, Pad, y + 8, "LIFTS IN GRAVITY", 11, Caption);
+        Label(ops, Pad, y + 8, "Lifts in gravity", 11, Caption);
         y += 18;
         string[] scaleLabels = { "0g", "0.5g", "1.0g", "1.5g" };
         for (int i = 0; i < 4; i++)
@@ -294,7 +349,7 @@ public static class PanelLayout
                 Rect(ops, LiftX(r.ReferenceG) - 1, cy - 8.5f, 2, 17, Text);
 
             string limitText = limit < 0.005 ? "can't lift" : limit >= 99 ? "lifts up to 99+ g" : "lifts up to " + Number(limit, 2) + " g";
-            Label(ops, Right, cy, limitText, 12f, LiftColor(limit), Align.Right);
+            Label(ops, Right, cy, limitText, 12f, Text, Align.Right);
             y += 20;
         }
 
@@ -335,11 +390,9 @@ public static class PanelLayout
 
     private static float Finish(List<DrawOp> ops, float y)
     {
+        // Solid fill first: the HUD texture is mostly see-through and shows nothing until it has loaded
         ops[0] = new DrawOp { X = 0, Y = 0, W = Width, H = y, Color = Panel };
-        Rect(ops, 0, 0, Width, 1, Edge);
-        Rect(ops, 0, y - 1, Width, 1, Edge);
-        Rect(ops, 0, 0, 1, y, Edge);
-        Rect(ops, Width - 1, 0, 1, y, Edge);
+        ops[1] = new DrawOp { X = 0, Y = 0, W = Width, H = y, Color = PanelTint, Texture = PanelTexture };
         return y;
     }
 
@@ -354,8 +407,10 @@ public static class PanelLayout
     private static void Label(List<DrawOp> ops, float x, float y, string text, float size, Rgba color, Align align = Align.Left)
     {
         if (!string.IsNullOrEmpty(text))
-            ops.Add(new DrawOp { IsText = true, X = x, Y = y, Text = text, Size = size, Color = color, Align = align });
+            ops.Add(new DrawOp { IsText = true, X = x, Y = y, Text = text, Size = size, Color = color, Align = align, Blue = IsLabelTint(color) });
     }
+
+    private static bool IsLabelTint(Rgba c) => c.R == 255 && c.G == 255 && c.B == 255 && c.A < 255;
 
     public static Rgba LiftColor(double twr) => twr < 1.0 ? Bad : twr < 1.25 ? Warn : Good;
 
@@ -377,6 +432,14 @@ public static class PanelLayout
     }
 
     private static string Multiplier(double value) => Number(value, Math.Abs(value - Math.Round(value)) < 1e-3 ? 0 : 1);
+
+    /// <summary>Newtons as kN below 1 MN, else MN: 850 kN, 7.20 MN.</summary>
+    public static string Force(double newtons)
+    {
+        if (double.IsNaN(newtons)) return "?";
+        if (newtons < 1000000) return Number(newtons / 1000.0, newtons < 100000 ? 1 : 0) + " kN";
+        return Number(newtons / 1000000.0, 2) + " MN";
+    }
 
     /// <summary>Kilograms, as the game shows mass: 850 kg, 18.1k kg, 182k kg, 1.25M kg.</summary>
     public static string Mass(double kg)

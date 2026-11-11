@@ -6,11 +6,11 @@ Mass, thrust-to-weight per direction, lift range and hover endurance for your sh
 
 ## What it shows
 
-A dark blue HUD panel in the vanilla style, top to bottom:
+A HUD panel drawn like the game's own block info panel (same background texture, colours and fonts; colour only on the bars), top to bottom:
 
 | Part | Meaning |
 |---|---|
-| Header | Ship name. While building, an amber strip shows the block in hand, how many copies, which way it pushes and its mass |
+| Header | Ship name. While building, an amber strip shows the block in hand, how many copies, its mass and, for thrusters, the thrust it adds where you are and which way it pushes |
 | Weight boxes | **Current weight** (what physics uses), **Heavy (full of ore)** (every inventory full of the densest ore it accepts), **Max (densest cargo)** (every inventory full of the densest item it accepts), in kg. Cargo volume and inventory multiplier below |
 | Thrust to weight ratio | Per direction, with a bar per load. In gravity it is measured against the gravity where you are, with thruster effectiveness for the air where you are; in space against 1 g. Directions with the same numbers share a row (Fwd / Back, Up / Down, Left / Right). Up: green 1.25 and over, yellow 1 to 1.25, red under 1. Other directions: green 0.6 and over, yellow 0.3 to 0.6, red under 0.3 |
 | Space capable | Yes if something pushes that way in vacuum, no if nothing does |
@@ -31,6 +31,8 @@ Hold a block and aim at a grid you own, share a faction with, or that has no own
 
 - Every block adds its mass.
 - Thrusters add thrust in the direction they would push, so rotate the block and watch the table change. Symmetry copies are counted too.
+- Each ratio the held block changes shows the change under it (+0.58 in amber for a gain), and the gained part of the bar is amber. The table keeps the same height whatever the rows, so the panel does not jump while you rotate the block.
+- A block of the other grid size (a large block aimed at a small grid, or the reverse) would start a new grid, so it is not added and the panel hides.
 - Cargo containers add their volume to the heavy and max loads.
 
 The same key while holding a block aimed at a grid cycles this panel: full, collapsed, hidden. It starts on full each time you load a world. Turn it off completely with **Show while building** in the settings.

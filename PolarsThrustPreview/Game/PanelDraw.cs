@@ -7,13 +7,14 @@ using VRageMath;
 namespace PolarsThrustPreview.Game;
 
 /// <summary>
-/// Draws the prepared layout every frame: flat rectangles and text, nothing else. Panel pixels
+/// Draws the prepared layout every frame: the HUD panel texture, flat rectangles and text. Panel pixels
 /// are designed for a 1080p screen and scaled to the real resolution and the text size setting.
 /// No allocation here.
 /// </summary>
 internal static class PanelDraw
 {
-    private const string Font = "White";
+    private const string ValueFont = "White";
+    private const string LabelFont = "Blue";
     private const string Blank = "Textures\\GUI\\Blank.dds";
 
     /// <summary>Text size setting that draws the panel at its designed size.</summary>
@@ -35,9 +36,10 @@ internal static class PanelDraw
         float k = screenHeight / 1080f * (textScale / DesignTextScale);
         var unit = new Vector2(k * perPixel.X, k * perPixel.Y);
 
-        // Font height in screen pixels at scale 1, to size text in design pixels
-        float fontPixels = MyGuiManager.GetFontHeight(Font, 1f) / perPixel.Y;
-        if (fontPixels <= 0)
+        // Font heights in screen pixels at scale 1, to size text in design pixels
+        float valuePixels = MyGuiManager.GetFontHeight(ValueFont, 1f) / perPixel.Y;
+        float labelPixels = MyGuiManager.GetFontHeight(LabelFont, 1f) / perPixel.Y;
+        if (valuePixels <= 0 || labelPixels <= 0)
             return;
 
         var size = new Vector2(PanelLayout.Width * unit.X, panelHeight * unit.Y);
@@ -55,12 +57,13 @@ internal static class PanelDraw
 
             if (op.IsText)
             {
-                float scale = op.Size * LineToFont * k / fontPixels;
-                MyGuiManager.DrawString(Font, op.Text, at, scale, color, AlignOf(op.Align));
+                string font = op.Blue ? LabelFont : ValueFont;
+                float scale = op.Size * LineToFont * k / (op.Blue ? labelPixels : valuePixels);
+                MyGuiManager.DrawString(font, op.Text, at, scale, color, AlignOf(op.Align));
             }
             else if (op.W > 0 && op.H > 0)
             {
-                MyGuiManager.DrawSpriteBatch(Blank, at, new Vector2(op.W * unit.X, op.H * unit.Y), color,
+                MyGuiManager.DrawSpriteBatch(op.Texture ?? Blank, at, new Vector2(op.W * unit.X, op.H * unit.Y), color,
                     MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_TOP, useFullClientArea: false, waitTillLoaded: false);
             }
         }

@@ -32,6 +32,9 @@ public class ThrustPreviewSession : MySessionComponentBase
 
     private readonly ShipScanner scanner = new();
     private readonly Report report = new();
+
+    /// <summary>The ship without the held block, to show what the block adds.</summary>
+    private readonly Report baseline = new();
     private readonly List<DrawOp> ops = new();
     private float panelHeight;
     private readonly List<MatrixD> placements = new();
@@ -151,7 +154,8 @@ public class ThrustPreviewSession : MySessionComponentBase
             var newMode = Mode.None;
 
             IMyCubeGrid target = null;
-            holdingBlock = config.ShowWhileBuilding && BuilderAccess.TryGetHeld(out held, out target, placements) && CanBuildOn(target);
+            holdingBlock = config.ShowWhileBuilding && BuilderAccess.TryGetHeld(out held, out target, placements) && CanBuildOn(target)
+                && held.CubeSize == target.GridSizeEnum; // a different grid size starts a new grid
             if (holdingBlock)
             {
                 if (buildState == 2)
@@ -318,18 +322,24 @@ public class ThrustPreviewSession : MySessionComponentBase
             StaticGrid = scanner.AnyStatic,
         };
 
-        if (mode == Mode.Build && held != null)
-            AddHeldBlock(held, reference, blocksMultiplier, ref context);
-
         var position = referenceBlock?.GetPosition() ?? root.WorldAABB.Center;
-        report.Compute(model, Ambient.At(position));
+        var here = Ambient.At(position);
+
+        if (mode == Mode.Build && held != null)
+        {
+            baseline.Compute(model, here);
+            context.BaseTwr = baseline.Twr;
+            AddHeldBlock(held, reference, blocksMultiplier, here, config.ThrustMultiplier, ref context);
+        }
+
+        report.Compute(model, here);
         bool collapsed = mode == Mode.Build ? buildState == 1 : cockpitState == 2;
         var view = collapsed ? PanelView.Collapsed : PanelView.Full;
         panelHeight = PanelLayout.Build(report, context, view, ops);
     }
 
     /// <summary>Adds the block in hand (and its symmetry copies) to the model before it is placed.</summary>
-    private void AddHeldBlock(MyCubeBlockDefinition held, MatrixD reference, double blocksMultiplier, ref PanelContext context)
+    private void AddHeldBlock(MyCubeBlockDefinition held, MatrixD reference, double blocksMultiplier, Surroundings here, double thrustMultiplier, ref PanelContext context)
     {
         var model = scanner.Model;
         int copies = Math.Max(1, placements.Count);
@@ -353,14 +363,16 @@ public class ThrustPreviewSession : MySessionComponentBase
         if (!(held is MyThrustDefinition thrust))
             return;
 
+        // Built fresh each time: its fuel index belongs to the current scan.
+        var spec = scanner.SpecFor(thrust, out _);
+        context.HeldThrust = spec.Force * thrustMultiplier * copies
+            * ThrustMath.Effectiveness(spec, here.AirDensity, here.HasAtmosphere);
+
         if (placements.Count == 0)
         {
             context.HeldPush = "?";
             return;
         }
-
-        // Built fresh each time: its fuel index belongs to the current scan.
-        var spec = scanner.SpecFor(thrust, out _);
 
         var toReference = MatrixD.Transpose(reference);
         int first = model.Thrusters.Count;
